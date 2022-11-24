@@ -5,15 +5,17 @@ import com.codeborne.xlstest.XLS;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
-import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipFile;
+
 
 import static com.codeborne.selenide.Selenide.$;
 import static com.codeborne.selenide.Selenide.open;
@@ -57,23 +59,40 @@ public class FileParseTest {
 
     @Test
     void zipTest() throws Exception {
-        ZipFile zf = new ZipFile(new File("files.zip"));
-        try(ZipInputStream is = new ZipInputStream(cl.getResourceAsStream("files.zip"))) {
-            ZipEntry entry;
-            while ((entry = is.getNextEntry())!= null) {
-                String entryName = entry.getName();
-                System.out.println(entryName);
-                if (entry.getName().endsWith("pdf")) {
-                    InputStream inputStream = zf.getInputStream(entry);
-                    PDF pdf = new PDF(inputStream);
-                    assertThat(pdf.text).contains("TEST123");
+        try (InputStream is = cl.getResourceAsStream("files.zip");
+             ZipInputStream zis = new ZipInputStream(is);
+             ZipFile zipFile = new java.util.zip.ZipFile("src/test/resources/files.zip")) {
 
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                String entryName = entry.getName();
+                if (entryName.contains(".pdf")) {
+                    try (InputStream inputStream = zipFile.getInputStream(entry)) {
+                        PDF pdf = new PDF(inputStream);
+                        String actualValue = pdf.text;
+                        assertThat(actualValue).contains("TEST123");
+                    }
+                } else if (entryName.contains(".csv")) {
+                    try (CSVReader reader = new CSVReader(new InputStreamReader(zipFile.getInputStream(entry)))) {
+                        List<String[]> content = reader.readAll();
+                        String[] row = content.get(1);
+                        assertThat(row[0]).isEqualTo("Дата и время выгрузки;27 сентября 2022 10:56:02");
+                    }
+                }
+                else {
+                    XLS xls = new XLS(zipFile.getInputStream(entry));
+                    assertThat(
+                            xls.excel.getSheetAt(0)
+                                    .getRow(1)
+                                    .getCell(1)
+                                    .getStringCellValue()
+                    ).contains("27 сентября 2022 10:56:02");
                 }
             }
         }
     }
 
-    @Test
+    /*@Test
     void jsonTest() {
         InputStream is = cl.getResourceAsStream("teacher.json");
         Gson gson = new Gson();
@@ -81,7 +100,7 @@ public class FileParseTest {
         assertThat(jsonObject.get("name").getAsString()).isEqualTo("Dmitrii");
         assertThat(jsonObject.get("isGoodTeacher").getAsBoolean()).isTrue();
         assertThat(jsonObject.get("passport").getAsJsonObject().get("number").getAsInt()).isEqualTo(123456);
-    }
+    }*/
 
    /* @Test
     void jsonTestWithModel() {

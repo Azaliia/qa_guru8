@@ -5,7 +5,7 @@ import com.codeborne.xlstest.XLS;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
-import quru.qa.model.Teacher;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -57,11 +57,19 @@ public class FileParseTest {
 
     @Test
     void zipTest() throws Exception {
-        InputStream is = cl.getResourceAsStream("files.zip");
-        ZipInputStream zis = new ZipInputStream(is);
-        ZipEntry entry;
-        while ((entry = zis.getNextEntry()) != null) {
-            String entryName = entry.getName();
+        ZipFile zf = new ZipFile(new File("files.zip"));
+        try(ZipInputStream is = new ZipInputStream(cl.getResourceAsStream("files.zip"))) {
+            ZipEntry entry;
+            while ((entry = is.getNextEntry())!= null) {
+                String entryName = entry.getName();
+                System.out.println(entryName);
+                if (entry.getName().endsWith("pdf")) {
+                    InputStream inputStream = zf.getInputStream(entry);
+                    PDF pdf = new PDF(inputStream);
+                    assertThat(pdf.text).contains("TEST123");
+
+                }
+            }
         }
     }
 
@@ -75,7 +83,7 @@ public class FileParseTest {
         assertThat(jsonObject.get("passport").getAsJsonObject().get("number").getAsInt()).isEqualTo(123456);
     }
 
-    @Test
+   /* @Test
     void jsonTestWithModel() {
         InputStream is = cl.getResourceAsStream("teacher.json");
         Gson gson = new Gson();
@@ -83,5 +91,5 @@ public class FileParseTest {
         assertThat(teacher.name).isEqualTo("Dmitrii");
         assertThat(teacher.isGoodTeacher).isTrue();
         assertThat(teacher.passport.number).isEqualTo(123456);
-    }
+    }*/
 }
